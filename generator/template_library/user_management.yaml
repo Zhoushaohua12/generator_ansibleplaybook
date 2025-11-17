@@ -1,0 +1,48 @@
+name: user_management
+description: Create and manage system users with SSH keys
+prompts:
+  - name: username
+    description: Username to create
+    type: string
+    required: true
+  - name: user_groups
+    description: Comma-separated list of groups
+    type: string
+    required: false
+    default: users
+  - name: ssh_key
+    description: SSH public key for the user
+    type: string
+    required: false
+  - name: sudo_access
+    description: Grant sudo access to the user
+    type: boolean
+    required: false
+    default: false
+vars:
+  target_user: "{{ username }}"
+tasks:
+  - name: Create user {{ username }}
+    module: user
+    params:
+      name: "{{ username }}"
+      groups: "{{ user_groups }}"
+      shell: /bin/bash
+      createhome: true
+      state: present
+  - name: Add SSH key for {{ username }}
+    module: authorized_key
+    params:
+      user: "{{ username }}"
+      key: "{{ ssh_key }}"
+      state: present
+    when: "{{ ssh_key }}"
+  - name: Grant sudo access to {{ username }}
+    module: lineinfile
+    params:
+      path: /etc/sudoers.d/{{ username }}
+      line: "{{ username }} ALL=(ALL) NOPASSWD:ALL"
+      create: true
+      mode: "0440"
+    when: "{{ sudo_access }}"
+handlers: []

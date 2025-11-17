@@ -1,0 +1,34 @@
+name: firewall
+description: Configure firewall rules with UFW
+prompts:
+  - name: allowed_ports
+    description: Comma-separated list of ports to allow (e.g., 22,80,443)
+    type: string
+    required: true
+    default: "22,80,443"
+  - name: default_policy
+    description: Default firewall policy (allow or deny)
+    type: string
+    required: false
+    default: deny
+vars:
+  firewall_policy: "{{ default_policy }}"
+tasks:
+  - name: Install UFW
+    module: package
+    params:
+      name: ufw
+      state: present
+  - name: Set default policy to {{ default_policy }}
+    module: ufw
+    params:
+      state: enabled
+      policy: "{{ default_policy }}"
+  - name: Allow ports
+    module: ufw
+    params:
+      rule: allow
+      port: "{{ item }}"
+      proto: tcp
+    loop: "{{ allowed_ports.split(',') }}"
+handlers: []
