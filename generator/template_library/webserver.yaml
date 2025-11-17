@@ -1,0 +1,50 @@
+name: webserver
+description: Install and configure a web server (Apache or Nginx)
+prompts:
+  - name: server_type
+    description: Type of web server to install (apache2 or nginx)
+    type: string
+    required: true
+    default: nginx
+  - name: port
+    description: Port for the web server to listen on
+    type: integer
+    required: true
+    default: 80
+  - name: enable_ssl
+    description: Whether to enable SSL
+    type: boolean
+    required: false
+    default: false
+vars:
+  server_package: "{{ server_type }}"
+  server_port: "{{ port }}"
+tasks:
+  - name: Install {{ server_type }}
+    module: package
+    params:
+      name: "{{ server_type }}"
+      state: present
+  - name: Start {{ server_type }} service
+    module: service
+    params:
+      name: "{{ server_type }}"
+      state: started
+      enabled: true
+    notify:
+      - restart {{ server_type }}
+  - name: Configure {{ server_type }} port
+    module: lineinfile
+    params:
+      path: "/etc/{{ server_type }}/ports.conf"
+      regexp: "^Listen"
+      line: "Listen {{ port }}"
+    when: "{{ server_type }} == 'apache2'"
+    notify:
+      - restart {{ server_type }}
+handlers:
+  - name: restart {{ server_type }}
+    module: service
+    params:
+      name: "{{ server_type }}"
+      state: restarted

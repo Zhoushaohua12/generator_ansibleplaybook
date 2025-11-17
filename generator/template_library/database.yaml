@@ -1,0 +1,57 @@
+name: database
+description: Install and configure a database server (MySQL or PostgreSQL)
+prompts:
+  - name: db_type
+    description: Type of database to install (mysql or postgresql)
+    type: string
+    required: true
+    default: postgresql
+  - name: db_name
+    description: Name of the database to create
+    type: string
+    required: true
+  - name: db_user
+    description: Database user to create
+    type: string
+    required: true
+  - name: create_backup
+    description: Whether to set up automated backups
+    type: boolean
+    required: false
+    default: false
+vars:
+  database_type: "{{ db_type }}"
+  database_name: "{{ db_name }}"
+tasks:
+  - name: Install {{ db_type }}
+    module: package
+    params:
+      name: "{{ db_type }}"
+      state: present
+  - name: Start {{ db_type }} service
+    module: service
+    params:
+      name: "{{ db_type }}"
+      state: started
+      enabled: true
+  - name: Create database {{ db_name }}
+    module: "{{ db_type }}_db"
+    params:
+      name: "{{ db_name }}"
+      state: present
+  - name: Create database user {{ db_user }}
+    module: "{{ db_type }}_user"
+    params:
+      name: "{{ db_user }}"
+      password: changeme
+      priv: "{{ db_name }}.*:ALL"
+      state: present
+  - name: Set up backup cron job
+    module: cron
+    params:
+      name: "Backup {{ db_name }}"
+      minute: "0"
+      hour: "2"
+      job: "pg_dump {{ db_name }} > /var/backups/{{ db_name }}.sql"
+    when: "{{ create_backup }}"
+handlers: []

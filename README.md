@@ -10,6 +10,7 @@ A Python CLI tool for generating Ansible playbooks from Jinja2 templates. The to
 - 🔗 **Template loops and conditions**: Support for Jinja2 loops and when clauses
 - 🧪 **Comprehensive test suite**: Full pytest coverage with fixtures and CLI tests
 - 📚 **Multiple templates**: Basic, task-based, and conditional playbook templates included
+- 🏗️ **Generator Engine**: Python API for programmatic playbook generation from YAML module library
 
 ## Table of Contents
 
@@ -19,6 +20,7 @@ A Python CLI tool for generating Ansible playbooks from Jinja2 templates. The to
   - [Interactive Mode](#interactive-mode)
   - [Command-line Mode](#command-line-mode)
   - [Using Parameter Files](#using-parameter-files)
+- [Generator Engine](#generator-engine)
 - [Templates](#templates)
   - [Basic Template](#basic-template)
   - [Task Template](#task-template)
@@ -197,6 +199,80 @@ Then generate the playbook:
 
 ```bash
 playbook-gen generate-from-file with_tasks webserver_params.yaml -o webservers.yml
+```
+
+## Generator Engine
+
+The generator engine provides a Python API for programmatic playbook generation from YAML module templates.
+
+### Quick Start with Generator Engine
+
+```python
+from generator import PlaybookBuilder
+
+# Create builder and list available modules
+builder = PlaybookBuilder()
+modules = builder.list_modules()
+print(f"Available modules: {modules}")
+
+# Build a playbook with multiple modules
+builder.set_playbook_name("Production Server Setup")
+builder.set_hosts("production")
+
+# Add webserver module
+builder.add_module('webserver', {
+    'server_type': 'nginx',
+    'port': 80,
+    'enable_ssl': False
+})
+
+# Add firewall module
+builder.add_module('firewall', {
+    'allowed_ports': '22,80,443',
+    'default_policy': 'deny'
+})
+
+# Write to generated_playbooks/ directory
+output_path = builder.write_to_file()
+print(f"Playbook written to: {output_path}")
+```
+
+### Features
+
+- **YAML Module Library**: Define reusable modules in `generator/template_library/`
+- **Validation**: Comprehensive validation with actionable error messages
+- **Jinja2 Rendering**: Full Jinja2 template support in module definitions
+- **Optional Sections**: Support for `loop`, `when`, `notify` in tasks
+- **Multiple Modules**: Combine multiple modules into a single playbook
+- **Custom Variables**: Add custom variables to playbooks
+- **Timestamped Files**: Optional timestamped output filenames
+
+### Included Modules
+
+- **webserver**: Install and configure Apache or Nginx
+- **database**: Set up MySQL or PostgreSQL with users and backups
+- **user_management**: Create system users with SSH keys and sudo access
+- **firewall**: Configure UFW firewall with custom rules
+
+### Documentation
+
+For complete API reference and usage examples, see:
+- `generator/README.md` - Full generator engine documentation
+- `GENERATOR_ENGINE.md` - Implementation details and architecture
+- `demo_generator.py` - Interactive demo script
+
+### Demo
+
+Run the demo to see the generator engine in action:
+
+```bash
+python demo_generator.py
+```
+
+Run acceptance tests:
+
+```bash
+python test_generator_acceptance.py
 ```
 
 ## Templates
