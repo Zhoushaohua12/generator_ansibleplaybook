@@ -1,0 +1,19 @@
+playbook_name: "Install and Configure Services"
+hosts: "all"
+tasks:
+  - name: "Install Apache"
+    module: "package"
+    params:
+      name: "apache2"
+      state: "present"
+  - name: "Start Apache service"
+    module: "service"
+    params:
+      name: "apache2"
+      state: "started"
+      enabled: "yes"
+  - name: "Deploy configuration file"
+    module: "template"
+    params:
+      src: "apache.j2"
+      dest: "/etc/apache2/apache2.conf"

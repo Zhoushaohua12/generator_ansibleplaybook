@@ -1,0 +1,2 @@
+playbook_name: "Deploy Web Application"
+hosts: "webservers"
