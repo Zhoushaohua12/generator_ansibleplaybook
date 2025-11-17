@@ -1,0 +1,8 @@
+---
+- name: {{ playbook_name | default('Basic Playbook') }}
+  hosts: {{ hosts | default('all') }}
+  gather_facts: yes
+  tasks:
+    - name: Debug message
+      debug:
+        msg: "Running {{ playbook_name }}"

@@ -1,0 +1,23 @@
+---
+- name: {{ playbook_name | default('Conditional Playbook') }}
+  hosts: {{ hosts | default('all') }}
+  gather_facts: yes
+  {% set all_vars = vars | default({}) %}
+  {% if all_vars %}
+  vars:
+    {% for key, value in all_vars.items() %}
+    {{ key }}: {{ value }}
+    {% endfor %}
+  {% endif %}
+  tasks:
+    {% for task in tasks | default([]) %}
+    - name: {{ task.name }}
+      {{ task.module }}:
+        {% set params = task.get('params', {}) %}
+        {% for key, value in params.items() %}
+        {{ key }}: {{ value }}
+        {% endfor %}
+      {% if task.when %}
+      when: {{ task.when }}
+      {% endif %}
+    {% endfor %}

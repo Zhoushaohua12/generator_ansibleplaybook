@@ -1,0 +1,13 @@
+---
+- name: {{ playbook_name | default('Task Playbook') }}
+  hosts: {{ hosts | default('all') }}
+  gather_facts: yes
+  tasks:
+    {% for task in tasks | default([]) %}
+    - name: {{ task.name }}
+      {{ task.module }}:
+        {% set params = task.get('params', {}) %}
+        {% for key, value in params.items() %}
+        {{ key }}: {{ value }}
+        {% endfor %}
+    {% endfor %}

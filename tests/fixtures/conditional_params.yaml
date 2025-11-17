@@ -1,0 +1,24 @@
+playbook_name: "Conditional Task Execution"
+hosts: "all"
+vars:
+  environment_type: "production"
+  enable_logging: true
+tasks:
+  - name: "Install monitoring tools"
+    module: "package"
+    params:
+      name: "prometheus"
+      state: "present"
+    when: "environment_type == 'production'"
+  - name: "Configure logging"
+    module: "template"
+    params:
+      src: "logging.conf.j2"
+      dest: "/etc/logging.conf"
+    when: "enable_logging"
+  - name: "Restart services"
+    module: "service"
+    params:
+      name: "rsyslog"
+      state: "restarted"
+    when: "enable_logging"
