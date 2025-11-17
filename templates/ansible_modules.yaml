@@ -1,0 +1,879 @@
+# Ansible Module Templates Catalogue
+# 
+# This file catalogues supported Ansible modules with their metadata, prompts, and task templates.
+# Each module definition includes:
+#   - name: Unique module identifier for the generator
+#   - human_name: Human-readable display name
+#   - description: Purpose and use case
+#   - ansible_module: Official Ansible module name
+#   - default_task_name: Default pattern for task naming
+#   - category: Module category (system, file, network, other)
+#   - handlers: Optional event handlers (notify hooks)
+#   - prompts: Input parameters with types, defaults, and validation
+#   - task_template: Jinja2 template for the task structure with placeholders
+#
+# EXTENDING THIS FILE:
+# 1. Add a new module entry with all required fields
+# 2. Define prompts with type validation (string, integer, boolean, list, dict)
+# 3. Create task_template with Jinja2 placeholders for user parameters
+# 4. Support 'when' conditions, 'loop' iterations, and 'notify' handlers
+# 5. Document the purpose and any dependencies in description
+#
+# PLACEHOLDER MAPPING:
+# Prompts defined in the prompts section become available as Jinja2 variables
+# in the task_template. For example:
+#   - Prompt named 'package_name' can be used as {{ package_name }} in templates
+#   - List prompts can be looped: {% for item in items %}...{% endfor %}
+#   - Conditional logic: {% if condition %}...{% endif %}
+#
+# YAML LOADING:
+# This file can be loaded with PyYAML's safe_load():
+#   import yaml
+#   with open('templates/ansible_modules.yaml', 'r') as f:
+#       modules_catalogue = yaml.safe_load(f)
+#
+
+modules:
+  # ==== SYSTEM MODULES ====
+  
+  - name: user
+    human_name: User Management
+    description: Create, modify, and delete system users with shell access, home directories, and group membership
+    ansible_module: user
+    default_task_name: "Manage user {{ username }}"
+    category: system
+    handlers: []
+    prompts:
+      - name: username
+        description: Username to create or modify
+        type: string
+        required: true
+        default: null
+      - name: uid
+        description: Numeric user ID (optional)
+        type: integer
+        required: false
+        default: null
+      - name: group
+        description: Primary group for the user
+        type: string
+        required: false
+        default: null
+      - name: groups
+        description: Comma-separated list of supplementary groups
+        type: string
+        required: false
+        default: null
+      - name: shell
+        description: User's login shell
+        type: string
+        required: false
+        default: /bin/bash
+      - name: home
+        description: Home directory path
+        type: string
+        required: false
+        default: "/home/{{ username }}"
+      - name: createhome
+        description: Create home directory if it doesn't exist
+        type: boolean
+        required: false
+        default: true
+      - name: state
+        description: User state (present or absent)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent]
+    task_template: |
+      name: {{ default_task_name }}
+      user:
+        name: {{ username }}
+        {% if uid %}uid: {{ uid }}{% endif %}
+        {% if group %}group: {{ group }}{% endif %}
+        {% if groups %}groups: {{ groups }}{% endif %}
+        shell: {{ shell }}
+        home: {{ home }}
+        createhome: {{ createhome | lower }}
+        state: {{ state }}
+
+  - name: group
+    human_name: Group Management
+    description: Create, modify, and delete system groups
+    ansible_module: group
+    default_task_name: "Manage group {{ groupname }}"
+    category: system
+    handlers: []
+    prompts:
+      - name: groupname
+        description: Name of the group
+        type: string
+        required: true
+        default: null
+      - name: gid
+        description: Numeric group ID (optional)
+        type: integer
+        required: false
+        default: null
+      - name: state
+        description: Group state (present or absent)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent]
+    task_template: |
+      name: {{ default_task_name }}
+      group:
+        name: {{ groupname }}
+        {% if gid %}gid: {{ gid }}{% endif %}
+        state: {{ state }}
+
+  - name: service
+    human_name: Service Management
+    description: Manage system services with start, stop, restart, reload, and enable/disable operations
+    ansible_module: service
+    default_task_name: "Manage {{ service_name }} service"
+    category: system
+    handlers:
+      - restart service
+      - reload service
+    prompts:
+      - name: service_name
+        description: Name of the service to manage
+        type: string
+        required: true
+        default: null
+      - name: state
+        description: Service state (started, stopped, restarted, reloaded)
+        type: string
+        required: false
+        default: started
+        choices: [started, stopped, restarted, reloaded]
+      - name: enabled
+        description: Enable service on boot
+        type: boolean
+        required: false
+        default: true
+    task_template: |
+      name: {{ default_task_name }}
+      service:
+        name: {{ service_name }}
+        state: {{ state }}
+        enabled: {{ enabled | lower }}
+      {% if state == 'restarted' %}notify:
+        - restart service{% endif %}
+
+  - name: package
+    human_name: Package Management
+    description: Install, upgrade, and remove packages using the system package manager
+    ansible_module: package
+    default_task_name: "Manage package {{ package_name }}"
+    category: system
+    handlers: []
+    prompts:
+      - name: package_name
+        description: Name of the package to manage
+        type: string
+        required: true
+        default: null
+      - name: state
+        description: Package state (present, absent, latest)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent, latest]
+    task_template: |
+      name: {{ default_task_name }}
+      package:
+        name: {{ package_name }}
+        state: {{ state }}
+
+  - name: yum
+    human_name: YUM Package Management
+    description: Manage packages on systems using YUM (Red Hat, CentOS, Fedora)
+    ansible_module: yum
+    default_task_name: "YUM manage {{ package_name }}"
+    category: system
+    handlers: []
+    prompts:
+      - name: package_name
+        description: Package name or list of packages
+        type: string
+        required: true
+        default: null
+      - name: state
+        description: Package state (present, absent, latest)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent, latest]
+      - name: enable_repo
+        description: Repository to enable (optional)
+        type: string
+        required: false
+        default: null
+    task_template: |
+      name: {{ default_task_name }}
+      yum:
+        name: {{ package_name }}
+        state: {{ state }}
+        {% if enable_repo %}enablerepo: {{ enable_repo }}{% endif %}
+
+  - name: apt
+    human_name: APT Package Management
+    description: Manage packages on systems using APT (Debian, Ubuntu)
+    ansible_module: apt
+    default_task_name: "APT manage {{ package_name }}"
+    category: system
+    handlers: []
+    prompts:
+      - name: package_name
+        description: Package name or list of packages
+        type: string
+        required: true
+        default: null
+      - name: state
+        description: Package state (present, absent, latest)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent, latest]
+      - name: update_cache
+        description: Update apt cache before operation
+        type: boolean
+        required: false
+        default: false
+    task_template: |
+      name: {{ default_task_name }}
+      apt:
+        name: {{ package_name }}
+        state: {{ state }}
+        update_cache: {{ update_cache | lower }}
+
+  - name: systemd
+    human_name: Systemd Service Management
+    description: Manage systemd services with advanced options for enabled state and daemon reload
+    ansible_module: systemd
+    default_task_name: "Systemd manage {{ service_name }}"
+    category: system
+    handlers:
+      - restart systemd service
+      - reload systemd service
+    prompts:
+      - name: service_name
+        description: Name of the systemd service
+        type: string
+        required: true
+        default: null
+      - name: state
+        description: Service state (started, stopped, restarted, reloaded)
+        type: string
+        required: false
+        default: started
+        choices: [started, stopped, restarted, reloaded]
+      - name: enabled
+        description: Enable service on boot
+        type: boolean
+        required: false
+        default: true
+      - name: daemon_reload
+        description: Run daemon-reload before operation
+        type: boolean
+        required: false
+        default: false
+    task_template: |
+      name: {{ default_task_name }}
+      systemd:
+        name: {{ service_name }}
+        state: {{ state }}
+        enabled: {{ enabled | lower }}
+        {% if daemon_reload %}daemon_reload: true{% endif %}
+
+  # ==== FILE MODULES ====
+
+  - name: file
+    human_name: File Management
+    description: Manage file properties including permissions, ownership, and creation/deletion
+    ansible_module: file
+    default_task_name: "Manage file {{ filepath }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: filepath
+        description: Path to the file or directory
+        type: string
+        required: true
+        default: null
+      - name: state
+        description: State of the file (present, absent, directory, link, hard)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent, directory, link, hard, touch]
+      - name: mode
+        description: Permissions in octal format (e.g., '0644')
+        type: string
+        required: false
+        default: null
+      - name: owner
+        description: File owner username
+        type: string
+        required: false
+        default: null
+      - name: group
+        description: File group name
+        type: string
+        required: false
+        default: null
+    task_template: |
+      name: {{ default_task_name }}
+      file:
+        path: {{ filepath }}
+        state: {{ state }}
+        {% if mode %}mode: "{{ mode }}"{% endif %}
+        {% if owner %}owner: {{ owner }}{% endif %}
+        {% if group %}group: {{ group }}{% endif %}
+
+  - name: copy
+    human_name: File Copy
+    description: Copy files from local system or template files to remote hosts
+    ansible_module: copy
+    default_task_name: "Copy file to {{ destination }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: source
+        description: Source file path on local/control machine
+        type: string
+        required: true
+        default: null
+      - name: destination
+        description: Destination file path on remote host
+        type: string
+        required: true
+        default: null
+      - name: mode
+        description: Permissions in octal format (e.g., '0644')
+        type: string
+        required: false
+        default: "0644"
+      - name: owner
+        description: File owner username
+        type: string
+        required: false
+        default: null
+      - name: backup
+        description: Create backup of existing file
+        type: boolean
+        required: false
+        default: false
+    task_template: |
+      name: {{ default_task_name }}
+      copy:
+        src: {{ source }}
+        dest: {{ destination }}
+        mode: "{{ mode }}"
+        {% if owner %}owner: {{ owner }}{% endif %}
+        {% if backup %}backup: true{% endif %}
+
+  - name: lineinfile
+    human_name: Line in File
+    description: Ensure specific lines are present or absent in files using regex matching
+    ansible_module: lineinfile
+    default_task_name: "Manage line in {{ filepath }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: filepath
+        description: Path to the file to modify
+        type: string
+        required: true
+        default: null
+      - name: regexp
+        description: Regular expression to find the line
+        type: string
+        required: false
+        default: null
+      - name: line
+        description: The line to ensure is present
+        type: string
+        required: false
+        default: null
+      - name: state
+        description: State (present to add/update line, absent to remove)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent]
+      - name: create
+        description: Create file if it doesn't exist
+        type: boolean
+        required: false
+        default: false
+    task_template: |
+      name: {{ default_task_name }}
+      lineinfile:
+        path: {{ filepath }}
+        {% if regexp %}regexp: "{{ regexp }}"{% endif %}
+        {% if line %}line: "{{ line }}"{% endif %}
+        state: {{ state }}
+        create: {{ create | lower }}
+
+  - name: replace
+    human_name: Replace Lines in File
+    description: Replace all instances of a pattern in a file with a new pattern
+    ansible_module: replace
+    default_task_name: "Replace content in {{ filepath }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: filepath
+        description: Path to the file to modify
+        type: string
+        required: true
+        default: null
+      - name: regexp
+        description: Regular expression to find content
+        type: string
+        required: true
+        default: null
+      - name: replace
+        description: Replacement string
+        type: string
+        required: true
+        default: null
+      - name: backup
+        description: Create backup before modification
+        type: boolean
+        required: false
+        default: true
+    task_template: |
+      name: {{ default_task_name }}
+      replace:
+        path: {{ filepath }}
+        regexp: "{{ regexp }}"
+        replace: "{{ replace }}"
+        backup: {{ backup | lower }}
+
+  - name: blockinfile
+    human_name: Block in File
+    description: Insert, modify, or remove entire blocks of lines in files with unique markers
+    ansible_module: blockinfile
+    default_task_name: "Manage block in {{ filepath }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: filepath
+        description: Path to the file
+        type: string
+        required: true
+        default: null
+      - name: block
+        description: The content to insert (multi-line block)
+        type: string
+        required: true
+        default: null
+      - name: marker
+        description: Marker to identify the block (default, custom markers use {mark})
+        type: string
+        required: false
+        default: "# {mark} ANSIBLE MANAGED BLOCK"
+      - name: state
+        description: State (present to add block, absent to remove)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent]
+    task_template: |
+      name: {{ default_task_name }}
+      blockinfile:
+        path: {{ filepath }}
+        block: |
+          {{ block | indent(2) }}
+        marker: "{{ marker }}"
+        state: {{ state }}
+
+  - name: template
+    human_name: Template File
+    description: Deploy files using Jinja2 templating with variable substitution on remote host
+    ansible_module: template
+    default_task_name: "Deploy template to {{ destination }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: source
+        description: Source template file path on local/control machine
+        type: string
+        required: true
+        default: null
+      - name: destination
+        description: Destination file path on remote host
+        type: string
+        required: true
+        default: null
+      - name: mode
+        description: Permissions in octal format (e.g., '0644')
+        type: string
+        required: false
+        default: "0644"
+      - name: owner
+        description: File owner username
+        type: string
+        required: false
+        default: null
+      - name: backup
+        description: Create backup of existing file
+        type: boolean
+        required: false
+        default: false
+    task_template: |
+      name: {{ default_task_name }}
+      template:
+        src: {{ source }}
+        dest: {{ destination }}
+        mode: "{{ mode }}"
+        {% if owner %}owner: {{ owner }}{% endif %}
+        {% if backup %}backup: true{% endif %}
+
+  - name: stat
+    human_name: File Statistics
+    description: Gather facts about files and directories (permissions, size, timestamps, etc.)
+    ansible_module: stat
+    default_task_name: "Stat {{ filepath }}"
+    category: file
+    handlers: []
+    prompts:
+      - name: filepath
+        description: Path to the file or directory
+        type: string
+        required: true
+        default: null
+      - name: follow_symlinks
+        description: Follow symbolic links
+        type: boolean
+        required: false
+        default: true
+      - name: register_as
+        description: Variable name to register results (optional)
+        type: string
+        required: false
+        default: null
+    task_template: |
+      name: {{ default_task_name }}
+      stat:
+        path: {{ filepath }}
+        follow: {{ follow_symlinks | lower }}
+      {% if register_as %}register: {{ register_as }}{% endif %}
+
+  # ==== NETWORK MODULES ====
+
+  - name: firewalld
+    human_name: Firewalld Configuration
+    description: Configure firewalld firewall rules, zones, and services on RHEL/CentOS/Fedora
+    ansible_module: firewalld
+    default_task_name: "Configure firewalld rule"
+    category: network
+    handlers:
+      - reload firewalld
+    prompts:
+      - name: port
+        description: Port number or port range (e.g., '8080' or '8080-8090')
+        type: string
+        required: false
+        default: null
+      - name: service
+        description: Service name (e.g., 'http', 'https', 'ssh')
+        type: string
+        required: false
+        default: null
+      - name: protocol
+        description: Protocol (tcp or udp)
+        type: string
+        required: false
+        default: tcp
+        choices: [tcp, udp]
+      - name: state
+        description: Rule state (enabled or disabled)
+        type: string
+        required: false
+        default: enabled
+        choices: [enabled, disabled]
+      - name: permanent
+        description: Make rule permanent across reboots
+        type: boolean
+        required: false
+        default: true
+      - name: immediate
+        description: Apply rule immediately
+        type: boolean
+        required: false
+        default: true
+    task_template: |
+      name: {{ default_task_name }}
+      firewalld:
+        {% if port %}port: "{{ port }}/{{ protocol }}"{% endif %}
+        {% if service %}service: {{ service }}{% endif %}
+        state: {{ state }}
+        permanent: {{ permanent | lower }}
+        immediate: {{ immediate | lower }}
+
+  - name: iptables
+    human_name: IPTables Rules
+    description: Manage IPTables firewall rules for traffic filtering and NAT
+    ansible_module: iptables
+    default_task_name: "IPTables rule for {{ chain }}"
+    category: network
+    handlers: []
+    prompts:
+      - name: chain
+        description: IPTables chain (INPUT, OUTPUT, FORWARD)
+        type: string
+        required: true
+        default: INPUT
+        choices: [INPUT, OUTPUT, FORWARD]
+      - name: protocol
+        description: Protocol (tcp, udp, icmp, all)
+        type: string
+        required: true
+        default: tcp
+        choices: [tcp, udp, icmp, all]
+      - name: destination_port
+        description: Destination port or port range
+        type: string
+        required: false
+        default: null
+      - name: policy
+        description: Action for matched packets (ACCEPT, DROP, REJECT)
+        type: string
+        required: false
+        default: ACCEPT
+        choices: [ACCEPT, DROP, REJECT]
+      - name: state
+        description: Rule state (present or absent)
+        type: string
+        required: false
+        default: present
+        choices: [present, absent]
+    task_template: |
+      name: {{ default_task_name }}
+      iptables:
+        chain: {{ chain }}
+        protocol: {{ protocol }}
+        {% if destination_port %}destination_port: {{ destination_port }}{% endif %}
+        policy: {{ policy }}
+        state: {{ state }}
+
+  # ==== OTHER MODULES ====
+
+  - name: command
+    human_name: Execute Command
+    description: Run arbitrary commands on remote hosts without shell processing
+    ansible_module: command
+    default_task_name: "Execute command"
+    category: other
+    handlers: []
+    prompts:
+      - name: command_text
+        description: Command to execute
+        type: string
+        required: true
+        default: null
+      - name: creates
+        description: File that indicates command has already been run
+        type: string
+        required: false
+        default: null
+      - name: removes
+        description: File that indicates command should run
+        type: string
+        required: false
+        default: null
+      - name: register_as
+        description: Variable name to register command output
+        type: string
+        required: false
+        default: null
+    task_template: |
+      name: {{ default_task_name }}
+      command: {{ command_text }}
+      {% if creates %}creates: {{ creates }}{% endif %}
+      {% if removes %}removes: {{ removes }}{% endif %}
+      {% if register_as %}register: {{ register_as }}{% endif %}
+
+  - name: shell
+    human_name: Execute Shell Command
+    description: Run commands through the shell for shell-specific features (pipes, redirects, etc.)
+    ansible_module: shell
+    default_task_name: "Execute shell command"
+    category: other
+    handlers: []
+    prompts:
+      - name: shell_command
+        description: Shell command to execute (supports pipes, redirects, etc.)
+        type: string
+        required: true
+        default: null
+      - name: creates
+        description: File that indicates command has already been run
+        type: string
+        required: false
+        default: null
+      - name: register_as
+        description: Variable name to register command output
+        type: string
+        required: false
+        default: null
+    task_template: |
+      name: {{ default_task_name }}
+      shell: {{ shell_command }}
+      {% if creates %}creates: {{ creates }}{% endif %}
+      {% if register_as %}register: {{ register_as }}{% endif %}
+
+  - name: debug
+    human_name: Debug Output
+    description: Print debug messages and variable values for troubleshooting playbook execution
+    ansible_module: debug
+    default_task_name: "Debug message"
+    category: other
+    handlers: []
+    prompts:
+      - name: message
+        description: Debug message to print
+        type: string
+        required: false
+        default: null
+      - name: variable
+        description: Variable name to debug (optional alternative to message)
+        type: string
+        required: false
+        default: null
+      - name: verbosity
+        description: Only show message if verbosity >= this value (0-4)
+        type: integer
+        required: false
+        default: 0
+    task_template: |
+      name: {{ default_task_name }}
+      debug:
+        {% if message %}msg: "{{ message }}"{% endif %}
+        {% if variable %}var: {{ variable }}{% endif %}
+        verbosity: {{ verbosity }}
+
+  - name: set_fact
+    human_name: Set Facts/Variables
+    description: Set or update facts/variables during playbook execution for use in subsequent tasks
+    ansible_module: set_fact
+    default_task_name: "Set fact {{ variable_name }}"
+    category: other
+    handlers: []
+    prompts:
+      - name: variable_name
+        description: Name of the variable/fact to set
+        type: string
+        required: true
+        default: null
+      - name: variable_value
+        description: Value for the variable (string or expression)
+        type: string
+        required: true
+        default: null
+      - name: cacheable
+        description: Make fact cacheable across hosts
+        type: boolean
+        required: false
+        default: false
+    task_template: |
+      name: {{ default_task_name }}
+      set_fact:
+        {{ variable_name }}: "{{ variable_value }}"
+        cacheable: {{ cacheable | lower }}
+
+  - name: include_tasks
+    human_name: Include Task File
+    description: Include and execute tasks from an external file, supporting task reuse and composition
+    ansible_module: include_tasks
+    default_task_name: "Include tasks from {{ task_file }}"
+    category: other
+    handlers: []
+    prompts:
+      - name: task_file
+        description: Path to the task file to include (relative to playbook)
+        type: string
+        required: true
+        default: null
+      - name: apply_vars
+        description: Variables to apply to included tasks (dict)
+        type: dict
+        required: false
+        default: null
+    task_template: |
+      name: {{ default_task_name }}
+      include_tasks: {{ task_file }}
+      {% if apply_vars %}vars:
+        {% for key, value in apply_vars.items() %}
+        {{ key }}: {{ value }}
+        {% endfor %}{% endif %}
+
+  - name: notify
+    human_name: Trigger Handlers
+    description: Trigger handler execution when notified by other tasks (event-driven operations)
+    ansible_module: null
+    default_task_name: "Notify handler"
+    category: other
+    handlers: []
+    prompts:
+      - name: handler_name
+        description: Name of the handler to trigger
+        type: string
+        required: true
+        default: null
+      - name: task_condition
+        description: When to trigger handler (condition in Jinja2)
+        type: string
+        required: false
+        default: null
+    task_template: |
+      # Notify is used within task definitions, not as a standalone module
+      # Include 'notify' in other tasks to trigger handlers:
+      # notify:
+      #   - {{ handler_name }}
+      # Handler definition:
+      # - name: {{ handler_name }}
+      #   [module name]:
+      #     [module params]
+
+# ==== REFERENCE INFORMATION ====
+#
+# Module Categories:
+#   - system: System-level operations (users, services, packages)
+#   - file: File and directory management
+#   - network: Network and firewall configuration
+#   - other: Miscellaneous modules (debugging, task control, etc.)
+#
+# Prompt Types:
+#   - string: Text value (quotes required for complex strings in YAML)
+#   - integer: Numeric integer value
+#   - boolean: True/False logical value
+#   - list: Array of values
+#   - dict: Key-value pairs
+#
+# Task Template Features:
+#   - Jinja2 variables: {{ variable_name }} - replaced with user input
+#   - Conditionals: {% if condition %}...{% endif %} - conditional inclusion
+#   - Loops: {% for item in list %}...{% endfor %} - iterate over lists
+#   - Filters: {{ value | lower }}, {{ value | upper }} - transform values
+#   - Indentation: Use carefully to maintain valid YAML structure
+#
+# Usage in Generator Engine:
+#   1. Load catalogue with: yaml.safe_load(open('templates/ansible_modules.yaml', 'r'))
+#   2. Module templates can be converted to generator/template_library/*.yaml files
+#   3. Each module's prompts become Jinja2 context for task_template rendering
+#   4. Generated tasks include conditional logic, loops, and handlers as needed
+#   5. Tasks support 'when', 'loop', 'notify', and 'register' sections
+#
+# Handler Hooks:
+# Modules can define potential handlers in the 'handlers' list:
+#   - These are trigger names that other tasks can notify
+#   - Common patterns: "restart service", "reload config", "restart application"
+#   - Handlers execute once at end of play even if notified multiple times
+#
